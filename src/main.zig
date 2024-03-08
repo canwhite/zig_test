@@ -37,7 +37,7 @@ const Circle = struct {
 //这里的!不是取反，而是一个类型说明符前缀，表示返回值不会为null
 pub fn main() !void {
     // io
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    print("All your {s} are belong to us.\n", .{"codebase"});
     // 引入c的输出
     _ = c.printf("hello  world \n");
 
@@ -65,12 +65,12 @@ pub fn main() !void {
     // zig中导入的c语言类型如何用呢？
 
     //.{str}是把后续的值（即str）打包成一个数组传递给print函数
-    std.debug.print("data {s} \n", .{str});
-    std.debug.print("data {c}  \n", .{cha});
-    std.debug.print("data {d} \n", .{num});
+    print("data {s} \n", .{str});
+    print("data {c}  \n", .{cha});
+    print("data {d} \n", .{num});
     //bool和undefined不需要占位符, 这种也是通用输出格式
-    std.debug.print("data {}  \n", .{is});
-    std.debug.print("data {}  \n", .{f});
+    print("data {}  \n", .{is});
+    print("data {}  \n", .{f});
 
     //数组，动态数组，对象，数组对象
 
