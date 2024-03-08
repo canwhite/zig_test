@@ -44,7 +44,7 @@ pub fn main() !void {
     //变量和基本数据类型
     //基础指针：导入的C语言类型，如 c_int, c_char, c_float 等
     const x: c_int = 10;
-    std.debug.print("x {} \n", .{x});
+    print("x {} \n", .{x});
 
     var integer: i16 = 666;
     const ptr = &integer;
