@@ -9,6 +9,30 @@ const c = @cImport({
 const print = std.debug.print;
 const ArrayList = std.ArrayList;
 
+const Circle = struct {
+    radius: u8,
+    const PI: f16 = 3.14;
+    pub fn init(radius: u8) Circle {
+        return Circle{ .radius = radius };
+    }
+    fn area(self: *Circle) f16 {
+        return @as(f16, @floatFromInt(self.radius * self.radius)) * PI;
+    }
+};
+
+//和c做下对比吧
+
+// typedef struct Rectangle {
+//     float height;
+//     float width;
+// } Rectangle;
+
+// float getArea(Rectangle* self) {
+//     //return self->height * self->width;
+//     //or
+//     return (*self).height * (*self).width
+// }
+
 //这里的!不是取反，而是一个类型说明符前缀，表示返回值不会为null
 pub fn main() !void {
     // io
@@ -17,9 +41,13 @@ pub fn main() !void {
     _ = c.printf("hello  world \n");
 
     //变量和基本数据类型
-    // 导入的C语言类型，如 c_int, c_char, c_float 等
+    //基础指针：导入的C语言类型，如 c_int, c_char, c_float 等
     const x: c_int = 10;
     std.debug.print("x {} \n", .{x});
+
+    var integer: i16 = 666;
+    const ptr = &integer;
+    ptr.* = ptr.* + 1;
 
     // Integer: i8, u8, i16, u16, i32, u32, i64, u64, isize, usize
     // Floating Point: f32, f64
@@ -43,7 +71,7 @@ pub fn main() !void {
     std.debug.print("data {}  \n", .{is});
     std.debug.print("data {}  \n", .{f});
 
-    //TODO,数组，动态数组，对象，数组对象
+    //数组，动态数组，对象，数组对象
 
     //1）一般数组
     const message = [5]u8{ 'h', 'e', 'l', 'l', 'o' };
@@ -56,6 +84,7 @@ pub fn main() !void {
     var gpaList = ArrayList(f32).init(std.heap.page_allocator);
     //defer 关键字用于确保即使在函数早期退出时（例如，通过返回或错误），也可以执行某些必要的清理操作。在这个例子中，
     defer gpaList.deinit();
+    //try 关键字用于处理可能会返回错误的函数或者操作
     try gpaList.append(4.0);
     try gpaList.append(3.5);
     try gpaList.append(1.0);
@@ -64,6 +93,9 @@ pub fn main() !void {
     }
 
     //3）对象
+    const radius: u8 = 5;
+    var circle = Circle.init(radius);
+    print("The area of a circle with radius {} is {d:.2}\n", .{ radius, circle.area() });
 
     //4）数组对象
 
