@@ -1,14 +1,19 @@
 const std = @import("std");
 // const c = @cImport(@cInclude("stdio.h"));
 const c = @cImport({
-    //_NO_CRT_STDIO_INLINE 定义为 "1" 时，它将禁止CRT将某些标准输入/输出函数实现为内联函数
+    //_NO_CRT_STDIO_INLINE
+    //定义为 "1" 时，它将禁止CRT将某些标准输入/输出函数实现为内联函数
+    //
     @cDefine("_NO_CRT_STDIO_INLINE", "1");
     @cInclude("stdio.h");
 });
 // 直接将print提出来
 const print = std.debug.print;
 const ArrayList = std.ArrayList;
+// 内存分配器
+var gpaG = std.heap.GeneralPurposeAllocator(.{}){};
 
+//https://zigcc.github.io/zig-course/basic/advanced_type/struct.html
 const Circle = struct {
     radius: u8,
     const PI: f16 = 3.14;
@@ -18,6 +23,22 @@ const Circle = struct {
     }
     fn area(self: *Circle) f16 {
         return @as(f16, @floatFromInt(self.radius * self.radius)) * PI;
+    }
+};
+
+//self
+//注意这只是定义，need to init
+const User = struct {
+    userName: []u8,
+    pub fn init(userName: []u8) User {
+        return User{
+            .userName = userName,
+        };
+    }
+    pub fn print(self: *User) void {
+        //这里的.{}是创建数组和对象的字面量方法
+        //字符串的输出可以直接用s
+        std.debug.print("Hello, world! {s}\n", .{self.userName});
     }
 };
 
@@ -36,16 +57,8 @@ const Circle = struct {
 
 //这里的!不是取反，而是一个类型说明符前缀，表示返回值不会为null
 pub fn main() !void {
-    // io
-    print("All your {s} are belong to us.\n", .{"codebase"});
-    // 引入c的输出
-    _ = c.printf("hello  world \n");
 
     //变量和基本数据类型
-    //基础指针：导入的C语言类型，如 c_int, c_char, c_float 等
-    const x: c_int = 10;
-    print("x {} \n", .{x});
-
     var integer: i16 = 666;
     const ptr = &integer;
     ptr.* = ptr.* + 1;
@@ -98,17 +111,44 @@ pub fn main() !void {
     var circle = Circle.init(radius);
     print("The area of a circle with radius {} is {d:.2}\n", .{ radius, circle.area() });
 
+    //字面量创建,
+    const name = "xiaoming";
+
+    const allocator = gpaG.allocator();
+    defer {
+        const deinit_status = gpaG.deinit();
+        if (deinit_status == .leak) std.testing.expect(false) catch @panic("TEST FAIL");
+    }
+
+    const username = try allocator.alloc(u8, 20);
+    defer allocator.free(username);
+
+    // @memset 是一个内存初始化函数，它会将一段内存初始化为 0
+    @memset(username, 0);
+    // @memcpy 是一个内存拷贝函数，它会将一个内存区域的内容拷贝到另一个内存区域
+    @memcpy(username[0..name.len], name);
+
+    var tt: User = User.init(username);
+    tt.print();
+
     //4）数组对象
 
-    //TODO，指针
+    //TODO，指针以及和C合作
 
-    //TODO, 条件语句和其他语言一样
+    //基础指针：导入的C语言类型，如 c_int, c_char, c_float 等
+    // io
+    print("All your {s} are belong to us.\n", .{"codebase"});
+    // 引入c的输出
+    _ = c.printf("hello  world \n");
+
+    const x: c_int = 10;
+    print("x {} \n", .{x});
+
+    //PASS , 条件语句和其他语言一样
 
     //TODO，异步转同步
 
     //TODO，引入三方包和自己的文件
-
-    //TODO，和C合作
 
     // stdout is for the actual output of your application, for example if you
     // are implementing gzip, then only the compressed bytes should be sent to
