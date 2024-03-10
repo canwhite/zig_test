@@ -3,10 +3,12 @@ const std = @import("std");
 const c = @cImport({
     //_NO_CRT_STDIO_INLINE
     //定义为 "1" 时，它将禁止CRT将某些标准输入/输出函数实现为内联函数
-    //
     @cDefine("_NO_CRT_STDIO_INLINE", "1");
+    //引入c的标准库和三方库
     @cInclude("stdio.h");
+    @cInclude("curl/curl.h");
 });
+
 // 直接将print提出来
 const print = std.debug.print;
 const ArrayList = std.ArrayList;
@@ -114,6 +116,7 @@ pub fn main() !void {
     //字面量创建,
     const name = "xiaoming";
 
+    //TODO, 这个给字符串赋值的方法太麻烦了，我们可以优化下吗？
     const allocator = gpaG.allocator();
     defer {
         const deinit_status = gpaG.deinit();
@@ -131,9 +134,9 @@ pub fn main() !void {
     var tt: User = User.init(username);
     tt.print();
 
-    //4）数组对象
+    //4）TODO:对象数组
 
-    //TODO，指针以及和C合作
+    //TODO: 指针以及和C合作
 
     //基础指针：导入的C语言类型，如 c_int, c_char, c_float 等
     // io
@@ -144,11 +147,16 @@ pub fn main() !void {
     const x: c_int = 10;
     print("x {} \n", .{x});
 
+    //引入三方C包
+    var curl = c.curl_easy_init();
+    // 你可以开始使用curl库了
+    print("curl  {any}", .{curl});
+
+    //TODO: 引入自己写的zig工具
+
     //PASS , 条件语句和其他语言一样
 
-    //TODO，异步转同步
-
-    //TODO，引入三方包和自己的文件
+    //TODO，异步转同步，这个例子应该相当简单
 
     // stdout is for the actual output of your application, for example if you
     // are implementing gzip, then only the compressed bytes should be sent to

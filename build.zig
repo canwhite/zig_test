@@ -33,6 +33,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    exe.linkSystemLibrary("curl"); // 添加此行以链接到系统的curl库
 
     // 这声明了当用户调用 "install" 步骤时（默认步骤为运行 zig build），
     // 生成的可执行程序将被安装到标准位置的意图。
