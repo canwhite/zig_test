@@ -18,7 +18,7 @@ const Circle = struct {
     radius: u8,
     const PI: f16 = 3.14;
     pub fn init(radius: u8) Circle {
-        //结构体初始化赋值需.赋值的
+        //.{ .field = value} 这种算作是匿名结构体的初始化
         return Circle{ .radius = radius };
     }
     fn area(self: *Circle) f16 {
