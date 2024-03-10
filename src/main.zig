@@ -8,6 +8,8 @@ const c = @cImport({
     @cInclude("stdio.h");
     @cInclude("curl/curl.h");
 });
+//引入本地文件，直接
+// const sld = @import("./sdl.zig");
 
 // 直接将print提出来
 const print = std.debug.print;
@@ -107,13 +109,16 @@ pub fn main() !void {
     for (gpaList.items) |gpa| {
         print("{}\n", .{gpa});
     }
+    //TODO, 看下官方的HashMap
 
     //3）对象
     const radius: u8 = 5;
     var circle = Circle.init(radius);
     print("The area of a circle with radius {} is {d:.2}\n", .{ radius, circle.area() });
 
-    //字面量创建,
+    //字面量创建.{name = "xxx"}
+    //这个也可以说是匿名结构体，当然.{}也可以用来创建数组
+
     const name = "xiaoming";
 
     //TODO, 这个给字符串赋值的方法太麻烦了，我们可以优化下吗？
