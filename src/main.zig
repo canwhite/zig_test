@@ -40,13 +40,14 @@ const Circle = struct {
 //self
 //注意这只是定义，need to init
 const User = struct {
+    const Self = @This();
     userName: []const u8,
     pub fn init(userName: []const u8) User {
         return User{
             .userName = userName,
         };
     }
-    pub fn print(self: *User) void {
+    pub fn print(self: Self) void {
         //这里的.{}是创建数组和对象的字面量方法
         //字符串的输出可以直接用s
         std.debug.print("Hello, world! {s}\n", .{self.userName});
@@ -228,7 +229,7 @@ pub fn main() !void {
 
     //PASS , 条件语句和其他语言一样
 
-    //TODO:异步转同步，这个例子应该相当简单
+    //TODO: 线程
     //Thread
     //1) 使用非同步锁，无锁数据结构
     //这种算是先给空间，然后再想着使用
@@ -248,6 +249,10 @@ pub fn main() !void {
         handle.join();
     }
     std.debug.print("共享计数器的最终值: {}\n", .{counter});
+
+    //2）使用同步锁
+
+    //TODO：async/sync
 
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
