@@ -10,12 +10,19 @@ const c = @cImport({
 });
 //引入本地文件，直接
 // const sld = @import("./sdl.zig");
+const utils = @import("./utils/index.zig");
 
 // 直接将print提出来
 const print = std.debug.print;
 const ArrayList = std.ArrayList;
 // 内存分配器
-var gpaG = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+
+//使用两种非同步手段，无锁数据结构和compare and swap
+// const Atomic = std.atomic.Atomic(usize);
+const Thread = std.Thread;
+
+var counter = std.atomic.Atomic(usize).init(5);
 
 //https://zigcc.github.io/zig-course/basic/advanced_type/struct.html
 const Circle = struct {
@@ -33,8 +40,8 @@ const Circle = struct {
 //self
 //注意这只是定义，need to init
 const User = struct {
-    userName: []u8,
-    pub fn init(userName: []u8) User {
+    userName: []const u8,
+    pub fn init(userName: []const u8) User {
         return User{
             .userName = userName,
         };
@@ -59,8 +66,24 @@ const User = struct {
 //     return (*self).height * (*self).width
 // }
 
+fn func3() u32 {
+    return 5;
+}
+
+// while (condition) : (increment or mutation) {
+//     body
+// }
+fn workerFn() void {
+    var i: i32 = 0;
+    while (i < 100000) : (i += 1) {
+        _ = counter.fetchAdd(1, .Monotonic);
+    }
+}
+
 //这里的!不是取反，而是一个类型说明符前缀，表示返回值不会为null
 pub fn main() !void {
+
+    //.{}一般用于字面量创建数组和结构体， .. 是区间，...是省略的意思，表示拓展符
 
     //变量和基本数据类型
     var integer: i16 = 666;
@@ -82,6 +105,7 @@ pub fn main() !void {
     // zig中导入的c语言类型如何用呢？
 
     //.{str}是把后续的值（即str）打包成一个数组传递给print函数
+
     print("data {s} \n", .{str});
     print("data {c}  \n", .{cha});
     print("data {d} \n", .{num});
@@ -89,16 +113,35 @@ pub fn main() !void {
     print("data {}  \n", .{is});
     print("data {}  \n", .{f});
 
+    //TODO: 增加一些堆string的补充
+    //定义和使用的时候注意const和非const的区别 [] const u8, [] u8
+    //PS: 这里补充下
+
     //数组，动态数组，对象，数组对象
 
     //1）一般数组
-    const message = [5]u8{ 'h', 'e', 'l', 'l', 'o' };
+    var message = [5]u8{ 'h', 'e', 'l', 'l', 'o' };
     for (message, 0..) |val, index| {
         std.debug.print("{d}:{c}\n", .{ index, val });
     }
+    //切片-当然下边这种事静态切片，不能更改
+    var msg: []u8 = message[0..3];
+    print("--message--{any} \n", .{msg});
+
+    // 动态数组，不过下边这种已经被淘汰了，新版本的基本上都是ArrayList
+    // var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    // defer arena.deinit();
+    // const allocator = &arena.allocator;
+    // var message = [5]u8{ 'h', 'e', 'l', 'l', 'o' };
+    // var msg = try allocator.dupe(u8, message[0..3]);
+    // defer allocator.free(msg);
+    // try msg.append('a');
+    // try msg.append('b');
 
     //2）动态数组
+    // A）ArrayList是标准库里边给的创建动态数据的方式, 算是上述动态数组的简化版
     //参数是类型，init后边根的std里的heap，heap是许多的意，后边的属性是页面分配器
+    //heap -堆，allocator-分配器
     var gpaList = ArrayList(f32).init(std.heap.page_allocator);
     //defer 关键字用于确保即使在函数早期退出时（例如，通过返回或错误），也可以执行某些必要的清理操作。在这个例子中，
     defer gpaList.deinit();
@@ -106,10 +149,9 @@ pub fn main() !void {
     try gpaList.append(4.0);
     try gpaList.append(3.5);
     try gpaList.append(1.0);
-    for (gpaList.items) |gpa| {
-        print("{}\n", .{gpa});
+    for (gpaList.items) |gpaItem| {
+        print("{}\n", .{gpaItem});
     }
-    //TODO, 看下官方的HashMap
 
     //3）对象
     const radius: u8 = 5;
@@ -120,28 +162,50 @@ pub fn main() !void {
     //这个也可以说是匿名结构体，当然.{}也可以用来创建数组
 
     const name = "xiaoming";
-
-    //TODO, 这个给字符串赋值的方法太麻烦了，我们可以优化下吗？
-    const allocator = gpaG.allocator();
-    defer {
-        const deinit_status = gpaG.deinit();
-        if (deinit_status == .leak) std.testing.expect(false) catch @panic("TEST FAIL");
-    }
-
-    const username = try allocator.alloc(u8, 20);
-    defer allocator.free(username);
-
-    // @memset 是一个内存初始化函数，它会将一段内存初始化为 0
-    @memset(username, 0);
-    // @memcpy 是一个内存拷贝函数，它会将一个内存区域的内容拷贝到另一个内存区域
-    @memcpy(username[0..name.len], name);
-
-    var tt: User = User.init(username);
+    var tt: User = User.init(name);
     tt.print();
 
-    //4）TODO:对象数组
+    //3-1）看下官方的HashMap
 
-    //TODO: 指针以及和C合作
+    //使用动态内存分配器，arena 分出一块儿竞技场
+    //std.heap.ArenaAllocator 是一个内存池分配器，它会预先分配一大块内存，然后按需分割和分配给请求的内存。
+    // var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    // defer arena.deinit();
+    // //这个test_allocator 可以放入下边的init，直接使用std.heap.page_allocator初始化和上述ArrayList保持一致
+    // const test_allocator = arena.allocator();
+    const Point = struct { x: i32, y: i32 };
+
+    // var map = std.AutoHashMap(u32, Point).init(test_allocator);
+    // std.heap.page_allocator 创建一个哈希表时，你实际上是要求操作系统按需分配页内存给这个哈希表，通常每页4kb
+    var map = std.AutoHashMap(u32, Point).init(std.heap.page_allocator);
+    defer map.deinit();
+
+    try map.put(1525, .{ .x = 1, .y = -4 });
+    try map.put(1550, .{ .x = 2, .y = -3 });
+    try map.put(1575, .{ .x = 3, .y = -2 });
+    try map.put(1600, .{ .x = 4, .y = -1 });
+
+    print("map count : {} \n", .{map.count()});
+    var sum = Point{ .x = 0, .y = 0 };
+    //数组可以这样搞
+    var iterator = map.iterator();
+    while (iterator.next()) |entry| {
+        sum.x += entry.value_ptr.x;
+        sum.y += entry.value_ptr.y;
+    }
+    print("--sum--{} \n", .{sum});
+
+    //4）TODO:对象数组，我们来操作
+    var list = ArrayList(Point).init(std.heap.page_allocator);
+    defer list.deinit();
+    //往里边添加东西
+    try list.append(.{ .x = 1, .y = -4 });
+    try list.append(.{ .x = 2, .y = -3 });
+    std.debug.print("list的长度: {} \n", .{list.items.len});
+
+    //TODO: 指针以及和C合作使用c的异步，但是我仿佛看到zig本身就有Threads
+
+    //zig的异步转同步还不太完善，我们可以先用C的
 
     //基础指针：导入的C语言类型，如 c_int, c_char, c_float 等
     // io
@@ -155,17 +219,36 @@ pub fn main() !void {
     //引入三方C包
     var curl = c.curl_easy_init();
     // 你可以开始使用curl库了
-    print("curl  {any}", .{curl});
+    print("curl  {any} \n", .{curl});
 
-    //TODO: 引入自己写的zig工具
+    //引入自己写的zig工具
+    const a = 32;
+    const result = utils.addFortyTwo(a);
+    utils.log(result);
 
     //PASS , 条件语句和其他语言一样
 
-    //TODO，异步转同步，这个例子应该相当简单
+    //TODO:异步转同步，这个例子应该相当简单
+    //Thread
+    //1) 使用非同步锁，无锁数据结构
+    //这种算是先给空间，然后再想着使用
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
+    var thread_handles: [10]Thread = undefined;
+    // 启动10个工作线程
+    //|*handle|使我们能直接修改thread_handles数组内的指定元素，
+    //而不仅仅是在循环体内部作用域中修改元素的一个副本
+    for (thread_handles[0..]) |*handle| {
+        //spawn 引发，大量生辰，这种促使值增加和变化的，都需要加上try
+        const thread = try Thread.spawn(.{}, workerFn, .{});
+        //给分配的thread赋值
+        handle.* = thread;
+    }
+    // 等待所有工作线程完成
+    for (thread_handles[0..]) |handle| {
+        handle.join();
+    }
+    std.debug.print("共享计数器的最终值: {}\n", .{counter});
+
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
