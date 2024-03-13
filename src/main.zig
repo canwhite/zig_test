@@ -270,6 +270,8 @@ pub fn main() !void {
             //这种常规for循环的方法，
             //拿到一个数组，通过0.. 做step，然后 |vaule,index| 来拿细节操作
             for (@as([2]u64, @bitCast(self.get() + 1)), 0..) |v, i| {
+                //这&是地址，.*也是解引用 &xxx.* 和下边这个是不是很像
+                //for (&runners) |*r| r.thread
                 @as(*volatile u64, @ptrCast(&self.value[i])).* = v;
             }
         }
@@ -283,6 +285,7 @@ pub fn main() !void {
         counter: NonAtomicCounter = .{},
 
         //此方法要提供给线程使用
+        //这里的*是解引用，索引下边可以直接用
         fn run(self: *@This()) void {
             var i: usize = num_increments;
             while (i > 0) : (i -= 1) {
