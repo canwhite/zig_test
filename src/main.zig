@@ -21,6 +21,7 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 //使用两种非同步手段，无锁数据结构和compare and swap
 // const Atomic = std.atomic.Atomic(usize);
 const Thread = std.Thread;
+const Mutex = std.Thread.Mutex;
 
 var counter = std.atomic.Atomic(usize).init(5);
 
@@ -238,6 +239,7 @@ pub fn main() !void {
     // 启动10个工作线程
     //|*handle|使我们能直接修改thread_handles数组内的指定元素，
     //而不仅仅是在循环体内部作用域中修改元素的一个副本
+    //1.修改数据和共享数据的时候用指针呀
     for (thread_handles[0..]) |*handle| {
         //spawn 引发，大量生辰，这种促使值增加和变化的，都需要加上try
         const thread = try Thread.spawn(.{}, workerFn, .{});
@@ -250,7 +252,54 @@ pub fn main() !void {
     }
     std.debug.print("共享计数器的最终值: {}\n", .{counter});
 
-    //2）使用同步锁
+    //2）使用同步锁互斥锁
+
+    //针对Thread操作要熟悉这种通过提供一个struct给值和方法的方式进行线程操作
+    const NonAtomicCounter = struct {
+        const Self = @This();
+        value: [2]u64 = .{ 0, 0 },
+        //get
+        fn get(self: Self) u128 {
+            //@as-会将value值转化为type类型，
+            //@bitCast-运算符会将 value 的值转换为其位表示形式。
+            // 转换后的值将具有与 value 相同的大小和字节顺序
+            return @as(u128, @bitCast(self.value));
+        }
+        //add
+        fn inc(self: *Self) void {
+            //这种常规for循环的方法，
+            //拿到一个数组，通过0.. 做step，然后 |vaule,index| 来拿细节操作
+            for (@as([2]u64, @bitCast(self.get() + 1)), 0..) |v, i| {
+                @as(*volatile u64, @ptrCast(&self.value[i])).* = v;
+            }
+        }
+    };
+
+    const num_threads = 4;
+    const num_increments = 1000;
+    const Runner = struct {
+        mutex: Mutex = .{},
+        thread: Thread = undefined,
+        counter: NonAtomicCounter = .{},
+
+        //此方法要提供给线程使用
+        fn run(self: *@This()) void {
+            var i: usize = num_increments;
+            while (i > 0) : (i -= 1) {
+                self.mutex.lock();
+                defer self.mutex.unlock();
+                self.counter.inc();
+            }
+        }
+    };
+    //[_]Runner{.{}}表示一个未指定长度的Runner结构体类型的数组
+    //然后长度从后边给出，这是一个创建对象数组的方法
+    var runners = [_]Runner{.{}} ** num_threads;
+    //在这个例子中的 for(&array) |*e| e.xxx，e 是数组中元素的实例。
+    //这段代码通过 &array 获取了数组的引用，并通过 |*e| 遍历后，解引用得到了数组元素的实例。
+    for (&runners) |*r| r.thread = try Thread.spawn(.{}, Runner.run, .{r});
+    //因为用实例赋过值了，所以这里可以直接使用
+    for (runners) |r| r.thread.join();
 
     //TODO：async/sync
 
